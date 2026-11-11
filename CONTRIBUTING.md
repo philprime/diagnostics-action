@@ -36,6 +36,6 @@ For documentation-only changes, use `just format-check` to verify formatting. Pr
 - Do not log credentials, dump the environment, or collect unique hardware identifiers.
 - Explain the problem, rationale, and checks performed in your pull request. Report vulnerabilities through the [security reporting process](SECURITY.md), not public issues.
 
-The runtime entry point is [`scripts/main.sh`](scripts/main.sh). CI exercises both platforms, real Xcode destination inputs, and the failure-only workflow path.
+The runtime entry point is [`scripts/main.sh`](scripts/main.sh). CI exercises both platforms and real Xcode destination inputs. Diagnostics also run after genuine CI failures.
 
 Maintainers can find publishing instructions and repository protection requirements in [Releases](docs/releases.md).

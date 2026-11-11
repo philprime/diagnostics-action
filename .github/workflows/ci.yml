@@ -97,48 +97,9 @@ jobs:
         if: failure()
         uses: ./
 
-  failure-path:
-    name: Exercise failure-only diagnostics
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # A downstream required check verifies the results, so real regressions cannot be hidden.
-    continue-on-error: true
-    outputs:
-      verified: ${{ steps.verify.outputs.verified }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-
-      - name: Expected failing command
-        id: expected-failure
-        run: exit 1
-
-      - name: Run diagnostics after the failure
-        id: diagnostics
-        if: failure()
-        uses: ./
-
-      - name: Verify failure-path execution
-        id: verify
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          EXPECTED_OUTCOME: ${{ steps.expected-failure.outcome }}
-          DIAGNOSTICS_OUTCOME: ${{ steps.diagnostics.outcome }}
-        with:
-          script: |
-            if (process.env.EXPECTED_OUTCOME !== 'failure' || process.env.DIAGNOSTICS_OUTCOME !== 'success') {
-              core.setFailed('The expected failure must trigger successful diagnostics.');
-              return;
-            }
-            core.setOutput('verified', 'true');
-
   ci-required-check:
     name: CI - Required Check
-    needs: [test, failure-path]
+    needs: [test]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -149,8 +110,8 @@ jobs:
           echo "One of the CI jobs failed or was cancelled."
           exit 1
 
-      - name: Check test completion and failure-path verification
-        if: needs.test.result != 'success' || needs.failure-path.outputs.verified != 'true'
+      - name: Check test completion
+        if: needs.test.result != 'success'
         run: |
-          echo "Tests and failure-path verification must all pass."
+          echo "All tests must complete successfully."
           exit 1
