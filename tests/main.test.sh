@@ -7,7 +7,6 @@ BASH_BIN="$BASH"
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 mkdir -p "$TEMP_DIR/bin"
-ln -s "$(command -v sleep)" "$TEMP_DIR/bin/sleep"
 
 # Replace host tools so tests do not invoke Xcode or depend on the host OS.
 for tool in uname date sw_vers xcode-select xcodebuild xcrun sysctl df lscpu free cat; do
@@ -23,12 +22,6 @@ for arg in "$@"; do
   printf ' <%s>' "$arg"
 done
 printf '\n'
-if [[ "$name" == "${HANG_TOOL:-}" ]]; then
-  trap '' TERM
-  sleep 30 &
-  printf '%s\n' "$!" > "$CHILD_PID_FILE"
-  wait
-fi
 if [[ "$name" == "${FAIL_TOOL:-}" ]]; then
   exit 42
 fi
@@ -39,8 +32,6 @@ done
 run_diagnostics() {
 	: >"$TEMP_DIR/summary"
 	env PATH="$TEMP_DIR/bin" TEST_OS="$TEST_OS" FAIL_TOOL="${FAIL_TOOL:-}" \
-		HANG_TOOL="${HANG_TOOL:-}" CHILD_PID_FILE="$TEMP_DIR/child-pid" \
-		INPUT_TIMEOUT="${TIMEOUT:-120}" INPUT_COMMAND_TIMEOUT="${COMMAND_TIMEOUT:-30}" \
 		DEVELOPER_DIR='/Applications/Xcode.app/Contents/Developer' \
 		INPUT_WORKSPACE="${WORKSPACE:-}" INPUT_PROJECT="${PROJECT:-}" INPUT_SCHEME="${SCHEME:-}" \
 		GITHUB_STEP_SUMMARY="${SUMMARY_PATH-$TEMP_DIR/summary}" \
@@ -178,37 +169,3 @@ run_diagnostics
 contains '::warning::Unable to write the job summary'
 contains 'Completed diagnostics'
 printf 'PASS: an unwritable job summary does not fail diagnostics\n'
-
-SUMMARY_PATH=''
-HANG_TOOL=lscpu
-COMMAND_TIMEOUT=1
-started=$SECONDS
-run_diagnostics
-[[ $((SECONDS - started)) -lt 8 ]]
-contains '::warning::lscpu timed out'
-contains 'free <-h>'
-contains 'df <-h>'
-child_pid="$(cat "$TEMP_DIR/child-pid")"
-if kill -0 "$child_pid" 2>/dev/null; then
-	state="$(ps -o stat= -p "$child_pid")"
-	[[ "$state" == *Z* ]]
-fi
-printf 'PASS: hung commands and descendants are stopped while later diagnostics continue\n'
-
-TIMEOUT=1
-COMMAND_TIMEOUT=30
-run_diagnostics
-contains '::warning::lscpu timed out'
-excludes 'free <-h>'
-excludes 'df <-h>'
-contains 'Completed diagnostics'
-printf 'PASS: the overall budget skips later commands once exhausted\n'
-
-HANG_TOOL=''
-TIMEOUT=invalid
-COMMAND_TIMEOUT=0
-run_diagnostics
-contains '::warning::timeout must be'
-contains '::warning::command-timeout must be'
-contains 'df <-h>'
-printf 'PASS: invalid timeout inputs warn and use safe defaults\n'

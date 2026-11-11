@@ -31,7 +31,7 @@ For documentation-only changes, use `just format-check` to verify formatting. Pr
 ## Making changes
 
 - Keep the runtime compatible with Bash 3.2 on macOS and Bash on Linux. Do not introduce container or runtime package dependencies.
-- Keep diagnostics best-effort and bounded. A missing, failed, or timed-out command must not prevent later checks while budget remains.
+- Keep diagnostics best-effort. Missing or failed commands must not prevent later checks. Use GitHub's native `timeout-minutes` setting for execution limits.
 - Add behavior tests for runtime changes. Update [action metadata](action.yml) and the [README](README.md) when inputs change.
 - Do not log credentials, dump the environment, or collect unique hardware identifiers.
 - Explain the problem, rationale, and checks performed in your pull request. Report vulnerabilities through the [security reporting process](SECURITY.md), not public issues.
