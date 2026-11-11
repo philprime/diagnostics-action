@@ -24,7 +24,7 @@ If publishing partially fails, inspect the existing release and aliases before r
 Configure these settings on GitHub:
 
 - Enable immutable releases so published full-version tags and their release assets are locked.
-- Protect `main` with pull-request review and the CI **Required checks** status. This aggregate check verifies normal tests and the intentionally failing integration job, so the expected failure cannot hide a regression.
+- Protect `main` with pull-request review and the **CI - Required Check** status. This aggregate check verifies normal tests and the intentionally failing integration job, so the expected failure cannot hide a regression.
 - Restrict full-version tag creation to the release process, and prohibit updates and deletion of `v*.*.*` tags. Keep major-version aliases movable by the publishing workflow.
 - Enable private vulnerability reporting and restrict workflow changes to trusted maintainers.
 - Keep the default workflow token read-only, allowing the explicit publishing job to request write access.

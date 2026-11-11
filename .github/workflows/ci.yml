@@ -136,20 +136,21 @@ jobs:
             }
             core.setOutput('verified', 'true');
 
-  required:
-    name: Required checks
-    if: always()
+  ci-required-check:
+    name: CI - Required Check
     needs: [test, failure-path]
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify all checks
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          TEST_RESULT: ${{ needs.test.result }}
-          FAILURE_PATH_VERIFIED: ${{ needs.failure-path.outputs.verified }}
-        with:
-          script: |
-            if (process.env.TEST_RESULT !== 'success' || process.env.FAILURE_PATH_VERIFIED !== 'true') {
-              core.setFailed('Tests and failure-path verification must all pass.');
-            }
+      - name: Check for failures
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One of the CI jobs failed or was cancelled."
+          exit 1
+
+      - name: Check test completion and failure-path verification
+        if: needs.test.result != 'success' || needs.failure-path.outputs.verified != 'true'
+        run: |
+          echo "Tests and failure-path verification must all pass."
+          exit 1
