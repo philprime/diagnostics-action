@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable semantic version to publish, without a v prefix (for example 1.2.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      major: ${{ steps.version.outputs.major }}
+    steps:
+      - name: Validate branch and version
+        id: version
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        with:
+          script: |
+            if (context.ref !== 'refs/heads/main') {
+              throw new Error('Dispatch releases from main only.');
+            }
+            const version = process.env.RELEASE_VERSION;
+            const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
+            if (!match || match[0] !== version) {
+              throw new Error('Use a stable semantic version such as 1.2.3.');
+            }
+            core.setOutput('tag', `v${version}`);
+            core.setOutput('major', `v${match[1]}`);
+
+  checks:
+    name: Release checks
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish release
+    needs: [prepare, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Create release and update the major-version alias
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          MAJOR_TAG: ${{ needs.prepare.outputs.major }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const major = process.env.MAJOR_TAG;
+            // Creating the ref fails atomically if the full-version tag already exists.
+            await github.rest.git.createRef({
+              ...context.repo, ref: `refs/tags/${tag}`, sha: context.sha,
+            });
+            const { data: release } = await github.rest.repos.createRelease({
+              ...context.repo, tag_name: tag, name: tag,
+              target_commitish: context.sha, generate_release_notes: true,
+              make_latest: 'legacy',
+            });
+            let aliasExists = true;
+            try {
+              await github.rest.git.getRef({ ...context.repo, ref: `tags/${major}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              aliasExists = false;
+            }
+            if (aliasExists) {
+              await github.rest.git.updateRef({
+                ...context.repo, ref: `tags/${major}`, sha: context.sha, force: true,
+              });
+            } else {
+              await github.rest.git.createRef({
+                ...context.repo, ref: `refs/tags/${major}`, sha: context.sha,
+              });
+            }
+            core.notice(`Published ${release.html_url}`);
+            await core.summary.addHeading('Release').addLink(tag, release.html_url).write();

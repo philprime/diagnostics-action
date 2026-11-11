@@ -1,0 +1,17 @@
+{
+  "indentWidth": 2,
+  "json": {
+    "useTabs": false
+  },
+  "markdown": {},
+  "yaml": {
+    "indentWidth": 2
+  },
+  "includes": ["**/*.{json,md,yaml,yml,sh}"],
+  "plugins": [
+    "npm:@dprint/json@0.25.2",
+    "npm:@dprint/markdown@0.28.2",
+    "npm:dprint-plugin-yaml@0.6.0",
+    "npm:@dprint/shfmt@0.2.0"
+  ]
+}

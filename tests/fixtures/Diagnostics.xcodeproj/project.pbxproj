@@ -1,0 +1,67 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		000000000000000000000001 = {
+			isa = PBXProject;
+			buildConfigurationList = 000000000000000000000004;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			knownRegions = (en, Base);
+			mainGroup = 000000000000000000000002;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (000000000000000000000003);
+		};
+		000000000000000000000002 = {
+			isa = PBXGroup;
+			children = ();
+			sourceTree = "<group>";
+		};
+		000000000000000000000003 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000007;
+			buildPhases = ();
+			buildRules = ();
+			dependencies = ();
+			name = Diagnostics;
+			productName = Diagnostics;
+			productType = "com.apple.product-type.tool";
+		};
+		000000000000000000000004 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (000000000000000000000005, 000000000000000000000006);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000005 = {
+			isa = XCBuildConfiguration;
+			buildSettings = { SDKROOT = macosx; };
+			name = Debug;
+		};
+		000000000000000000000006 = {
+			isa = XCBuildConfiguration;
+			buildSettings = { SDKROOT = macosx; };
+			name = Release;
+		};
+		000000000000000000000007 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (000000000000000000000008, 000000000000000000000009);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000008 = {
+			isa = XCBuildConfiguration;
+			buildSettings = { PRODUCT_NAME = Diagnostics; SUPPORTED_PLATFORMS = macosx; };
+			name = Debug;
+		};
+		000000000000000000000009 = {
+			isa = XCBuildConfiguration;
+			buildSettings = { PRODUCT_NAME = Diagnostics; SUPPORTED_PLATFORMS = macosx; };
+			name = Release;
+		};
+	};
+	rootObject = 000000000000000000000001;
+}

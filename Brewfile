@@ -1,0 +1,5 @@
+brew "actionlint"
+brew "dprint"
+brew "just"
+brew "pre-commit"
+brew "shellcheck"

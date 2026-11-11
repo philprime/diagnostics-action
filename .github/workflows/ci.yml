@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Diagnostics (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout the exact workflow commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Test diagnostic behavior
+        run: just test
+
+      - name: Test macOS system Bash compatibility
+        if: runner.os == 'macOS'
+        run: just test-bash /bin/bash
+
+      - name: Smoke-test the composite action
+        uses: ./
+
+      - name: Observe real Xcode destination commands
+        if: runner.os == 'macOS'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const { execFileSync } = require('node:child_process');
+            const directory = path.join(process.env.RUNNER_TEMP, 'xcode-probe');
+            fs.mkdirSync(directory, { recursive: true });
+            const probe = path.join(directory, 'xcodebuild');
+            fs.copyFileSync('tests/xcodebuild-probe.sh', probe);
+            fs.chmodSync(probe, 0o755);
+            core.exportVariable('REAL_XCODEBUILD', execFileSync('/usr/bin/xcrun', ['--find', 'xcodebuild'], { encoding: 'utf8' }).trim());
+            core.exportVariable('XCODE_DESTINATION_RESULTS', path.join(directory, 'results'));
+            core.addPath(directory);
+
+      - name: Test real project destinations through the action
+        if: runner.os == 'macOS'
+        uses: ./
+        with:
+          project: tests/fixtures/Diagnostics.xcodeproj
+          scheme: Diagnostics
+
+      - name: Test real workspace destinations through the action
+        if: runner.os == 'macOS'
+        uses: ./
+        with:
+          workspace: tests/fixtures/Diagnostics.xcworkspace
+          scheme: Diagnostics
+
+      - name: Verify both destination checks succeeded
+        if: runner.os == 'macOS'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const fs = require('node:fs');
+            const results = fs.readFileSync(process.env.XCODE_DESTINATION_RESULTS, 'utf8').trim().split('\n');
+            if (results.length !== 2 || results.some(result => result !== '0')) {
+              core.setFailed('Both project and workspace destination commands must run and succeed.');
+            }
+
+      - name: Install development tools
+        if: runner.os == 'macOS'
+        run: brew bundle
+
+      - name: Run pre-commit checks
+        if: runner.os == 'macOS'
+        run: just hooks
+
+      - name: CI failure diagnostics
+        if: failure()
+        uses: ./
+
+  failure-path:
+    name: Exercise failure-only diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A downstream required check verifies the results, so real regressions cannot be hidden.
+    continue-on-error: true
+    outputs:
+      verified: ${{ steps.verify.outputs.verified }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Expected failing command
+        id: expected-failure
+        run: exit 1
+
+      - name: Run diagnostics after the failure
+        id: diagnostics
+        if: failure()
+        uses: ./
+
+      - name: Verify failure-path execution
+        id: verify
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          EXPECTED_OUTCOME: ${{ steps.expected-failure.outcome }}
+          DIAGNOSTICS_OUTCOME: ${{ steps.diagnostics.outcome }}
+        with:
+          script: |
+            if (process.env.EXPECTED_OUTCOME !== 'failure' || process.env.DIAGNOSTICS_OUTCOME !== 'success') {
+              core.setFailed('The expected failure must trigger successful diagnostics.');
+              return;
+            }
+            core.setOutput('verified', 'true');
+
+  required:
+    name: Required checks
+    if: always()
+    needs: [test, failure-path]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all checks
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          FAILURE_PATH_VERIFIED: ${{ needs.failure-path.outputs.verified }}
+        with:
+          script: |
+            if (process.env.TEST_RESULT !== 'success' || process.env.FAILURE_PATH_VERIFIED !== 'true') {
+              core.setFailed('Tests and failure-path verification must all pass.');
+            }

@@ -1,0 +1,55 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-case-conflict
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-xml
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.39.0
+    hooks:
+      - id: check-github-actions
+      - id: check-github-workflows
+        args: [--verbose]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck
+
+  - repo: local
+    hooks:
+      - id: format-dprint
+        name: Format JSON, Markdown, YAML, and shell scripts
+        entry: dprint fmt
+        language: system
+        files: \.(json|md|yaml|yml|sh)$
+
+      - id: format-just
+        name: Format Justfile
+        entry: just --fmt
+        language: system
+        files: ^Justfile$
+        pass_filenames: false
+
+      - id: analyze
+        name: Run static quality checks
+        entry: just analyze
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: test
+        name: Test diagnostics
+        entry: just test
+        language: system
+        files: ^(Justfile|scripts/|tests/)
+        pass_filenames: false

@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DIAGNOSTIC_COUNT=0
+WARNING_COUNT=0
+DEADLINE=0
+COMMAND_TIMEOUT=30
+
+configure_timeouts() {
+	local timeout="${INPUT_TIMEOUT:-120}"
+	COMMAND_TIMEOUT="${INPUT_COMMAND_TIMEOUT:-30}"
+	if [[ ! "$timeout" =~ ^[1-9][0-9]{0,3}$ ]] || ((timeout > 3600)); then
+		warn 'timeout must be an integer from 1 to 3600, using 120 seconds'
+		timeout=120
+	fi
+	if [[ ! "$COMMAND_TIMEOUT" =~ ^[1-9][0-9]{0,3}$ ]] || ((COMMAND_TIMEOUT > 3600)); then
+		warn 'command-timeout must be an integer from 1 to 3600, using 30 seconds'
+		COMMAND_TIMEOUT=30
+	fi
+	DEADLINE=$((SECONDS + timeout))
+}
+
+# Monitor mode gives the command its own process group on macOS and Linux.
+# Killing that group also stops descendants without requiring GNU timeout.
+run_bounded() {
+	local limit="$1" pid stop_at
+	shift
+	set -m
+	"$@" &
+	pid=$!
+	set +m
+	stop_at=$((SECONDS + limit))
+	while kill -0 "$pid" 2>/dev/null; do
+		if ((SECONDS >= stop_at)); then
+			kill -TERM -- "-$pid" 2>/dev/null || true
+			sleep 1
+			kill -KILL -- "-$pid" 2>/dev/null || true
+			wait "$pid" 2>/dev/null || true
+			return 124
+		fi
+		sleep 0.1
+	done
+	if wait "$pid"; then
+		return 0
+	else
+		return "$?"
+	fi
+}
+
+# GitHub Actions log formatting.
+begin_group() {
+	printf '::group::%s\n' "$1"
+}
+
+end_group() {
+	printf '::endgroup::\n'
+}
+
+warn() {
+	WARNING_COUNT=$((WARNING_COUNT + 1))
+	printf '::warning::%s\n' "$1"
+}
+
+# Each command is independent so a broken tool does not hide later diagnostics.
+run_diagnostic() {
+	local title="$1" limit status
+	shift
+	DIAGNOSTIC_COUNT=$((DIAGNOSTIC_COUNT + 1))
+	begin_group "$title"
+	printf '::debug::Running diagnostic command: %s\n' "$1"
+	limit=$((DEADLINE - SECONDS))
+	if ((limit <= 0)); then
+		warn 'Overall diagnostic budget exhausted, skipping command'
+	elif ! command -v "$1" >/dev/null 2>&1; then
+		warn "$1 is not available, skipping"
+	else
+		if ((limit > COMMAND_TIMEOUT)); then limit=$COMMAND_TIMEOUT; fi
+		if run_bounded "$limit" "$@"; then
+			:
+		else
+			status=$?
+			if [[ "$status" == 124 ]]; then
+				warn "$1 timed out, continuing diagnostics"
+			else
+				warn "$1 failed (exit $status), continuing diagnostics"
+			fi
+		fi
+	fi
+	end_group
+}
+
+collect_system() {
+	run_diagnostic 'Date (UTC)' date -u
+	run_diagnostic 'System information' uname -a
+}
+
+collect_xcode_destinations() {
+	if [[ -z "${INPUT_SCHEME:-}" ]]; then
+		printf '::debug::Skipping destinations: no scheme supplied\n'
+		return
+	fi
+
+	# Workspace takes precedence when both workspace and project are supplied.
+	if [[ -n "${INPUT_WORKSPACE:-}" ]]; then
+		run_diagnostic 'Available destinations' xcodebuild \
+			-workspace "$INPUT_WORKSPACE" -scheme "$INPUT_SCHEME" -showdestinations
+	elif [[ -n "${INPUT_PROJECT:-}" ]]; then
+		run_diagnostic 'Available destinations' xcodebuild \
+			-project "$INPUT_PROJECT" -scheme "$INPUT_SCHEME" -showdestinations
+	else
+		printf '::debug::Skipping destinations: no workspace or project supplied\n'
+	fi
+}
+
+collect_macos() {
+	local app found_xcode=false
+
+	run_diagnostic 'macOS version' sw_vers
+
+	begin_group 'Developer directory'
+	printf 'DEVELOPER_DIR=%s\n' "${DEVELOPER_DIR:-<not set>}"
+	end_group
+	run_diagnostic 'Selected developer directory' xcode-select -p
+
+	begin_group 'Installed Xcode applications'
+	for app in /Applications/Xcode*; do
+		if [[ -d "$app" ]]; then
+			printf '%s\n' "${app##*/}"
+			found_xcode=true
+		fi
+	done
+	if [[ "$found_xcode" == false ]]; then
+		warn 'No Xcode apps found in /Applications'
+	fi
+	end_group
+
+	run_diagnostic 'Active Xcode' xcodebuild -version
+	run_diagnostic 'Installed SDKs' xcodebuild -showsdks
+	run_diagnostic 'SDK details' xcodebuild -version -sdk
+	run_diagnostic 'Available simulator runtimes' xcrun simctl list runtimes
+	run_diagnostic 'Available simulator device types' xcrun simctl list devicetypes
+	run_diagnostic 'Available simulator devices' xcrun simctl list devices available
+	collect_xcode_destinations
+	run_diagnostic 'Hardware summary' sysctl hw.model hw.machine hw.ncpu hw.memsize
+}
+
+collect_linux() {
+	if [[ -r /etc/os-release ]]; then
+		run_diagnostic 'Linux distribution' cat /etc/os-release
+	fi
+	run_diagnostic 'CPU information' lscpu
+	run_diagnostic 'Memory information' free -h
+}
+
+write_summary() {
+	[[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
+
+	if {
+		printf '### diagnostics\n\n'
+		printf '| Platform | Commands checked | Warnings |\n'
+		printf '| --- | ---: | ---: |\n'
+		printf '| %s | %s | %s |\n\n' "$1" "$DIAGNOSTIC_COUNT" "$WARNING_COUNT"
+		printf 'See the grouped step logs for full diagnostic output.\n'
+	} >>"$GITHUB_STEP_SUMMARY"; then
+		:
+	else
+		warn 'Unable to write the job summary, see the step logs for diagnostics'
+	fi
+}
+
+main() {
+	local platform
+	platform="$(uname -s)" || platform=unknown
+
+	printf '::notice::Starting diagnostics\n'
+	configure_timeouts
+	collect_system
+	case "$platform" in
+	Darwin) collect_macos ;;
+	Linux) collect_linux ;;
+	*) warn 'Platform is not supported, collecting general diagnostics only' ;;
+	esac
+	run_diagnostic 'Disk space' df -h
+	write_summary "$platform"
+	printf '::notice::Completed diagnostics (%s commands checked, %s warnings)\n' \
+		"$DIAGNOSTIC_COUNT" "$WARNING_COUNT"
+}
+
+main "$@"

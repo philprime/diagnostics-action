@@ -1,0 +1,39 @@
+name: "diagnostics"
+author: "Philip Niedertscheider"
+description: "Emit best-effort system and Xcode diagnostics on macOS and Linux without containers"
+branding:
+  icon: "activity"
+  color: "blue"
+
+inputs:
+  timeout:
+    description: "Overall diagnostic command budget in seconds (1–3600). Up to one additional second is allowed to stop timed-out processes."
+    required: false
+    default: "120"
+  command-timeout:
+    description: "Maximum time for each diagnostic command in seconds (1–3600), also limited by the remaining overall budget."
+    required: false
+    default: "30"
+  workspace:
+    description: "Xcode workspace path, relative to the working directory or absolute. Takes precedence over project. Requires scheme to list destinations."
+    required: false
+  project:
+    description: "Xcode project path, relative to the working directory or absolute. Requires scheme to list destinations."
+    required: false
+  scheme:
+    description: "Xcode scheme used to list available destinations when workspace or project is supplied. Ignored on Linux."
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Emit diagnostics
+      shell: bash
+      env:
+        DIAGNOSTICS_ACTION_PATH: ${{ github.action_path }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_COMMAND_TIMEOUT: ${{ inputs.command-timeout }}
+        INPUT_WORKSPACE: ${{ inputs.workspace }}
+        INPUT_PROJECT: ${{ inputs.project }}
+        INPUT_SCHEME: ${{ inputs.scheme }}
+      run: bash "$DIAGNOSTICS_ACTION_PATH/scripts/main.sh"
