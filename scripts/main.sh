@@ -4,49 +4,6 @@ set -euo pipefail
 
 DIAGNOSTIC_COUNT=0
 WARNING_COUNT=0
-DEADLINE=0
-COMMAND_TIMEOUT=30
-
-configure_timeouts() {
-	local timeout="${INPUT_TIMEOUT:-120}"
-	COMMAND_TIMEOUT="${INPUT_COMMAND_TIMEOUT:-30}"
-	if [[ ! "$timeout" =~ ^[1-9][0-9]{0,3}$ ]] || ((timeout > 3600)); then
-		warn 'timeout must be an integer from 1 to 3600, using 120 seconds'
-		timeout=120
-	fi
-	if [[ ! "$COMMAND_TIMEOUT" =~ ^[1-9][0-9]{0,3}$ ]] || ((COMMAND_TIMEOUT > 3600)); then
-		warn 'command-timeout must be an integer from 1 to 3600, using 30 seconds'
-		COMMAND_TIMEOUT=30
-	fi
-	DEADLINE=$((SECONDS + timeout))
-}
-
-# Monitor mode gives the command its own process group on macOS and Linux.
-# Killing that group also stops descendants without requiring GNU timeout.
-run_bounded() {
-	local limit="$1" pid stop_at
-	shift
-	set -m
-	"$@" &
-	pid=$!
-	set +m
-	stop_at=$((SECONDS + limit))
-	while kill -0 "$pid" 2>/dev/null; do
-		if ((SECONDS >= stop_at)); then
-			kill -TERM -- "-$pid" 2>/dev/null || true
-			sleep 1
-			kill -KILL -- "-$pid" 2>/dev/null || true
-			wait "$pid" 2>/dev/null || true
-			return 124
-		fi
-		sleep 0.1
-	done
-	if wait "$pid"; then
-		return 0
-	else
-		return "$?"
-	fi
-}
 
 # GitHub Actions log formatting.
 begin_group() {
@@ -64,28 +21,17 @@ warn() {
 
 # Each command is independent so a broken tool does not hide later diagnostics.
 run_diagnostic() {
-	local title="$1" limit status
+	local title="$1"
 	shift
 	DIAGNOSTIC_COUNT=$((DIAGNOSTIC_COUNT + 1))
 	begin_group "$title"
 	printf '::debug::Running diagnostic command: %s\n' "$1"
-	limit=$((DEADLINE - SECONDS))
-	if ((limit <= 0)); then
-		warn 'Overall diagnostic budget exhausted, skipping command'
-	elif ! command -v "$1" >/dev/null 2>&1; then
+	if ! command -v "$1" >/dev/null 2>&1; then
 		warn "$1 is not available, skipping"
+	elif "$@"; then
+		:
 	else
-		if ((limit > COMMAND_TIMEOUT)); then limit=$COMMAND_TIMEOUT; fi
-		if run_bounded "$limit" "$@"; then
-			:
-		else
-			status=$?
-			if [[ "$status" == 124 ]]; then
-				warn "$1 timed out, continuing diagnostics"
-			else
-				warn "$1 failed (exit $status), continuing diagnostics"
-			fi
-		fi
+		warn "$1 failed (exit $?), continuing diagnostics"
 	fi
 	end_group
 }
@@ -174,7 +120,6 @@ main() {
 	platform="$(uname -s)" || platform=unknown
 
 	printf '::notice::Starting diagnostics\n'
-	configure_timeouts
 	collect_system
 	case "$platform" in
 	Darwin) collect_macos ;;

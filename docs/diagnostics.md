@@ -16,20 +16,25 @@ The caller chooses when the action runs using a step condition such as `if: fail
 
 Output uses collapsible log groups, start/completion notices, and warning annotations. Debug messages are visible when GitHub Actions step debugging is enabled. A job summary reports the platform, number of commands checked, and warning count. Full command output stays in the step logs.
 
-Missing tools, failed commands, and timeouts produce warnings without failing the action. No environment dump or artifact upload is performed. Logs can still contain hostnames, paths, project metadata, and tool output. See [Security](../SECURITY.md) before using sensitive self-hosted runners.
+Missing tools and failed commands produce warnings without failing the action. No environment dump or artifact upload is performed. Logs can still contain hostnames, paths, project metadata, and tool output. See [Security](../SECURITY.md) before using sensitive self-hosted runners.
 
 ## Timeouts
 
-The [`timeout` and `command-timeout` inputs](../README.md#inputs) accept integers from 1 to 3600 seconds. Invalid values produce warnings and use the defaults.
+Use GitHub Actions' native `timeout-minutes` setting on the diagnostic step or its job:
 
-Each command is limited by its per-command timeout and the remaining overall budget. A timed-out command and its process group receive a termination signal, followed by a forced stop after one second. Later commands continue while budget remains. When the overall budget is exhausted, later commands are skipped.
+```yaml
+- name: diagnostics
+  if: failure()
+  uses: philprime/diagnostics-action@v1
+  timeout-minutes: 2
+```
 
-Allow up to one additional second beyond the overall budget for process termination. These limits apply to diagnostic commands, not the rest of the caller's job.
+GitHub stops the entire step when its timeout is reached. A timed-out step fails and may stop before writing its job summary. Commands otherwise run sequentially without per-command deadlines or background watchdog processes. The action does not manage its own timeout.
 
 ## Runner requirements and permissions
 
 - GitHub-hosted macOS and Linux runners are supported. Windows runners are not supported.
-- Self-hosted runners need Bash 3.2 or newer and standard system utilities, including `sleep` with fractional-second support.
+- Self-hosted runners need Bash 3.2 or newer and the system tools used by the requested diagnostics.
 - Xcode-specific diagnostics require Xcode and its command-line tools. Missing tools produce warnings rather than failing the action.
 - Docker, Node.js, GNU `timeout`, and package installation are not required.
 

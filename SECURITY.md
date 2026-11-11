@@ -12,7 +12,7 @@ Security fixes target the latest stable major version. Use its latest patch rele
 
 The action does not require a GitHub token, dump the environment, or upload artifacts. It omits hardware serial numbers and UUIDs. Command output can still include hostnames, filesystem paths, project metadata, and information about installed tools or services. Review workflow log visibility before using it on sensitive self-hosted runners.
 
-The caller controls project and workspace inputs. Use trusted workflow definitions and pass inputs through action parameters rather than interpolating them into shell commands. The timeout budget limits diagnostic commands, not the rest of the caller's job.
+The caller controls project and workspace inputs. Use trusted workflow definitions and pass inputs through action parameters rather than interpolating them into shell commands. Use GitHub Actions' native `timeout-minutes` setting to limit the diagnostic step's execution time.
 
 ## Release integrity
 

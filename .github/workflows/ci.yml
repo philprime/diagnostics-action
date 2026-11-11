@@ -42,6 +42,7 @@ jobs:
 
       - name: Smoke-test the composite action
         uses: ./
+        timeout-minutes: 2
 
       - name: Observe real Xcode destination commands
         if: runner.os == 'macOS'
@@ -63,6 +64,7 @@ jobs:
       - name: Test real project destinations through the action
         if: runner.os == 'macOS'
         uses: ./
+        timeout-minutes: 2
         with:
           project: tests/fixtures/Diagnostics.xcodeproj
           scheme: Diagnostics
@@ -70,6 +72,7 @@ jobs:
       - name: Test real workspace destinations through the action
         if: runner.os == 'macOS'
         uses: ./
+        timeout-minutes: 2
         with:
           workspace: tests/fixtures/Diagnostics.xcworkspace
           scheme: Diagnostics
@@ -96,6 +99,7 @@ jobs:
       - name: CI failure diagnostics
         if: failure()
         uses: ./
+        timeout-minutes: 2
 
   ci-required-check:
     name: CI - Required Check

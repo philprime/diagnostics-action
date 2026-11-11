@@ -2,7 +2,7 @@
 
 Understand why your CI failed. This GitHub Action collects system and toolchain diagnostics on **macOS and Linux**, with additional Xcode, SDK, and simulator information on macOS.
 
-Diagnostics appear in grouped workflow logs and a job summary. Missing tools, failed commands, and timeouts produce warnings without failing the action. No containers, Node.js, or GitHub token are required.
+Diagnostics appear in grouped workflow logs and a job summary. Missing tools and failed commands produce warnings without failing the action. No containers, Node.js, or GitHub token are required.
 
 ## Usage
 
@@ -18,9 +18,10 @@ steps:
   - name: diagnostics
     if: failure()
     uses: philprime/diagnostics-action@v1
+    timeout-minutes: 2
 ```
 
-Use `if: failure()` to collect diagnostics only after a failed step, or `if: always()` to collect them regardless of earlier step outcomes.
+Use `if: failure()` to collect diagnostics only after a failed step, or `if: always()` to collect them regardless of earlier step outcomes. Set GitHub's `timeout-minutes` on the step to limit its execution time.
 
 ### Xcode destinations
 
@@ -30,6 +31,7 @@ Provide a workspace or project and a scheme to include available build destinati
 - name: diagnostics
   if: failure()
   uses: philprime/diagnostics-action@v1
+  timeout-minutes: 2
   with:
     workspace: App.xcworkspace
     scheme: App
@@ -37,15 +39,13 @@ Provide a workspace or project and a scheme to include available build destinati
 
 ## Inputs
 
-| Input             | Default | Description                                                            |
-| ----------------- | ------- | ---------------------------------------------------------------------- |
-| `workspace`       | Unset   | Xcode workspace path. Takes precedence over `project`.                 |
-| `project`         | Unset   | Xcode project path when no workspace is supplied.                      |
-| `scheme`          | Unset   | Scheme used to list destinations. Requires a workspace or project.     |
-| `timeout`         | `120`   | Overall diagnostic command budget, in seconds.                         |
-| `command-timeout` | `30`    | Per-command limit, in seconds, capped by the remaining overall budget. |
+| Input       | Description                                                        |
+| ----------- | ------------------------------------------------------------------ |
+| `workspace` | Xcode workspace path. Takes precedence over `project`.             |
+| `project`   | Xcode project path when no workspace is supplied.                  |
+| `scheme`    | Scheme used to list destinations. Requires a workspace or project. |
 
-Xcode inputs are ignored on Linux. Paths may be absolute or relative to your checkout directory.
+All inputs are optional and ignored on Linux. Paths may be absolute or relative to your checkout directory.
 
 ## Documentation
 
