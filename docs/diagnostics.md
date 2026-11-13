@@ -8,6 +8,20 @@
 | macOS           | OS version, developer directory, installed Xcode applications, active Xcode, SDKs, simulator runtimes, device types, available devices, hardware model, architecture, CPU count, and memory capacity. |
 | Linux           | OS distribution, CPU information, memory usage.                                                                                                                                                       |
 
+### macOS runner configuration
+
+The action also collects read-only runner configuration:
+
+- Automation Mode status and whether enabling it requires user authentication, using `automationmodetool` without arguments.
+- Developer Tools access using `DevToolsSecurity -status`.
+- System Integrity Protection using `csrutil status`.
+- Automated Device Enrollment (reported by macOS as DEP), MDM enrollment, and user approval status using filtered `profiles status -type enrollment` output. Management server URLs are omitted.
+- Console GUI session presence, whether the runner matches the console user, and whether the runner user's GUI launchd domain is available. Usernames, user IDs, and launchd contents are omitted. The root and Setup Assistant console owners are treated as no logged-in user session.
+
+These observations describe configuration, not application permissions or guaranteed UI-test readiness. Automation Mode can be disabled while allowing XCTest to enable it without authentication. An unenrolled runner or unavailable GUI session is not inherently misconfigured for its workload.
+
+No permissions are changed, no elevated access is requested, and no configuration profiles, TCC databases, or managed privacy policy files are dumped. Missing or inaccessible tools remain best-effort diagnostics. Detailed PPPC policy inspection is not included.
+
 On macOS, supplying a scheme and a workspace or project also runs `xcodebuild -showdestinations`. The workspace takes precedence if both paths are supplied. Without a scheme and a workspace or project, that check is skipped.
 
 The caller chooses when the action runs using a step condition such as `if: failure()`. The action does not inspect previous step outcomes.

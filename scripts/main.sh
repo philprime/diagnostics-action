@@ -59,10 +59,66 @@ collect_xcode_destinations() {
 	fi
 }
 
+collect_enrollment() {
+	local output line found=false
+	if ! command -v profiles >/dev/null 2>&1; then
+		printf 'profiles is not available\n'
+		return 1
+	fi
+	# Enrollment output also includes the management server URL. Never log it.
+	if ! output="$(profiles status -type enrollment 2>/dev/null)"; then
+		printf 'Unable to read MDM enrollment status\n'
+		return 1
+	fi
+	while IFS= read -r line; do
+		case "$line" in
+		'Enrolled via DEP: Yes' | 'Enrolled via DEP: No' | \
+			'MDM enrollment: Yes' | 'MDM enrollment: No' | \
+			'MDM enrollment: Yes (User Approved)')
+			printf '%s\n' "$line"
+			found=true
+			;;
+		esac
+	done <<<"$output"
+	if [[ "$found" == false ]]; then
+		printf 'MDM enrollment status: unknown (unrecognized output)\n'
+		return 1
+	fi
+}
+
+collect_gui_session() {
+	local console_uid runner_uid
+	console_uid="$(stat -f %u /dev/console 2>/dev/null)" || return 1
+	runner_uid="$(id -u 2>/dev/null)" || return 1
+	if [[ "$console_uid" == 0 || "$console_uid" == 248 ]]; then
+		printf 'Console GUI session: absent\n'
+	else
+		printf 'Console GUI session: present\n'
+	fi
+	if [[ "$console_uid" == "$runner_uid" && "$console_uid" != 0 && "$console_uid" != 248 ]]; then
+		printf 'Runner matches console user: yes\n'
+	else
+		printf 'Runner matches console user: no\n'
+	fi
+	if ! command -v launchctl >/dev/null 2>&1; then
+		printf 'Runner GUI launchd domain: unknown (launchctl unavailable)\n'
+		return 1
+	elif launchctl print "gui/$runner_uid" >/dev/null 2>&1; then
+		printf 'Runner GUI launchd domain: available\n'
+	else
+		printf 'Runner GUI launchd domain: unavailable\n'
+	fi
+}
+
 collect_macos() {
 	local app found_xcode=false
 
 	run_diagnostic 'macOS version' sw_vers
+	run_diagnostic 'Automation Mode and authentication requirement' automationmodetool
+	run_diagnostic 'Developer Tools access' DevToolsSecurity -status
+	run_diagnostic 'System Integrity Protection' csrutil status
+	run_diagnostic 'MDM enrollment status' collect_enrollment
+	run_diagnostic 'GUI session context' collect_gui_session
 
 	begin_group 'Developer directory'
 	printf 'DEVELOPER_DIR=%s\n' "${DEVELOPER_DIR:-<not set>}"
