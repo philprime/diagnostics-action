@@ -22,7 +22,7 @@ These observations describe configuration, not application permissions or guaran
 
 No permissions are changed, no elevated access is requested, and no configuration profiles, TCC databases, or managed privacy policy files are dumped. Missing or inaccessible tools remain best-effort diagnostics. Detailed PPPC policy inspection is not included.
 
-On macOS, supplying a scheme and a workspace or project also runs `xcodebuild -showdestinations`. The workspace takes precedence if both paths are supplied. Without a scheme and a workspace or project, that check is skipped.
+Xcode checks inspect the installed toolchain, SDKs, and simulators without opening a project or resolving Swift packages.
 
 The caller chooses when the action runs using a step condition such as `if: failure()`. The action does not inspect previous step outcomes.
 
@@ -54,4 +54,4 @@ GitHub stops the entire step when its timeout is reached. A timed-out step fails
 
 The action needs no GitHub token or GitHub API permissions. Choose workflow permissions based on the other steps in your job. For example, checking out a private repository requires `contents: read`.
 
-See the [README](../README.md) for usage examples and inputs.
+See the [README](../README.md) for usage examples.

@@ -4,7 +4,7 @@
 
 - Keep the action container-free and dependency-free. Use Bash compatible with macOS's system Bash 3.2 and Linux.
 - Use `just` for development tasks. `just setup` installs macOS tooling and pre-commit hooks.
-- `just test` runs shell behavior tests. `just test-bash /bin/bash` verifies the macOS system interpreter. `just test-xcode` checks real Xcode destinations. Always run tests through `just`.
+- `just test` runs shell behavior tests. `just test-bash /bin/bash` verifies the macOS system interpreter. Always run tests through `just`.
 - Source the CI Node version from `.nvmrc` using `node-version-file`. Node is development tooling only. Do not add it to the Brewfile.
 - `just lint` runs ShellCheck and actionlint. `just format-check` verifies dprint and Justfile formatting.
 - `just format` formats JSON, Markdown, YAML, shell scripts, and the Justfile. Dprint owns shell formatting too.

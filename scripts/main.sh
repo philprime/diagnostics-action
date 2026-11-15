@@ -41,24 +41,6 @@ collect_system() {
 	run_diagnostic 'System information' uname -a
 }
 
-collect_xcode_destinations() {
-	if [[ -z "${INPUT_SCHEME:-}" ]]; then
-		printf '::debug::Skipping destinations: no scheme supplied\n'
-		return
-	fi
-
-	# Workspace takes precedence when both workspace and project are supplied.
-	if [[ -n "${INPUT_WORKSPACE:-}" ]]; then
-		run_diagnostic 'Available destinations' xcodebuild \
-			-workspace "$INPUT_WORKSPACE" -scheme "$INPUT_SCHEME" -showdestinations
-	elif [[ -n "${INPUT_PROJECT:-}" ]]; then
-		run_diagnostic 'Available destinations' xcodebuild \
-			-project "$INPUT_PROJECT" -scheme "$INPUT_SCHEME" -showdestinations
-	else
-		printf '::debug::Skipping destinations: no workspace or project supplied\n'
-	fi
-}
-
 collect_enrollment() {
 	local output line found=false
 	if ! command -v profiles >/dev/null 2>&1; then
@@ -143,7 +125,6 @@ collect_macos() {
 	run_diagnostic 'Available simulator runtimes' xcrun simctl list runtimes
 	run_diagnostic 'Available simulator device types' xcrun simctl list devicetypes
 	run_diagnostic 'Available simulator devices' xcrun simctl list devices available
-	collect_xcode_destinations
 	run_diagnostic 'Hardware summary' sysctl hw.model hw.machine hw.ncpu hw.memsize
 }
 

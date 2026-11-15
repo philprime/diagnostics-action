@@ -23,10 +23,6 @@ test:
 test-bash interpreter:
     "$1" tests/main.test.sh
 
-# Run real Xcode destination checks on macOS without building the fixture.
-test-xcode:
-    bash tests/xcode.test.sh
-
 # Check shell scripts and workflows.
 lint:
     shellcheck scripts/*.sh tests/*.sh

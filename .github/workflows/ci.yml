@@ -44,50 +44,6 @@ jobs:
         uses: ./
         timeout-minutes: 2
 
-      - name: Observe real Xcode destination commands
-        if: runner.os == 'macOS'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            const fs = require('node:fs');
-            const path = require('node:path');
-            const { execFileSync } = require('node:child_process');
-            const directory = path.join(process.env.RUNNER_TEMP, 'xcode-probe');
-            fs.mkdirSync(directory, { recursive: true });
-            const probe = path.join(directory, 'xcodebuild');
-            fs.copyFileSync('tests/xcodebuild-probe.sh', probe);
-            fs.chmodSync(probe, 0o755);
-            core.exportVariable('REAL_XCODEBUILD', execFileSync('/usr/bin/xcrun', ['--find', 'xcodebuild'], { encoding: 'utf8' }).trim());
-            core.exportVariable('XCODE_DESTINATION_RESULTS', path.join(directory, 'results'));
-            core.addPath(directory);
-
-      - name: Test real project destinations through the action
-        if: runner.os == 'macOS'
-        uses: ./
-        timeout-minutes: 2
-        with:
-          project: tests/fixtures/Diagnostics.xcodeproj
-          scheme: Diagnostics
-
-      - name: Test real workspace destinations through the action
-        if: runner.os == 'macOS'
-        uses: ./
-        timeout-minutes: 2
-        with:
-          workspace: tests/fixtures/Diagnostics.xcworkspace
-          scheme: Diagnostics
-
-      - name: Verify both destination checks succeeded
-        if: runner.os == 'macOS'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            const fs = require('node:fs');
-            const results = fs.readFileSync(process.env.XCODE_DESTINATION_RESULTS, 'utf8').trim().split('\n');
-            if (results.length !== 2 || results.some(result => result !== '0')) {
-              core.setFailed('Both project and workspace destination commands must run and succeed.');
-            }
-
       - name: Install development tools
         if: runner.os == 'macOS'
         run: brew bundle
