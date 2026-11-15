@@ -134,35 +134,15 @@ printf 'PASS: enrollment failures do not leak partial output or stop later check
 CONSOLE_UID=501
 FAIL_TOOL=''
 
-SCHEME=App
-run_diagnostics
-excludes '-showdestinations'
-printf 'PASS: destination check requires a workspace or project\n'
-
 WORKSPACE='App With Spaces.xcworkspace'
-SCHEME="App \$(touch should-not-exist); *"
-run_diagnostics
-contains "xcodebuild <-workspace> <App With Spaces.xcworkspace> <-scheme> <App \$(touch should-not-exist); *> <-showdestinations>"
-printf 'PASS: workspace and scheme are passed as literal arguments\n'
-
-WORKSPACE=''
 PROJECT='App With Spaces.xcodeproj'
-run_diagnostics
-contains "xcodebuild <-project> <App With Spaces.xcodeproj> <-scheme> <App \$(touch should-not-exist); *> <-showdestinations>"
-printf 'PASS: project destination check is configurable\n'
-
-WORKSPACE='Preferred.xcworkspace'
-run_diagnostics
-contains 'xcodebuild <-workspace> <Preferred.xcworkspace> <-scheme>'
-excludes '<-project>'
-printf 'PASS: workspace takes precedence over project\n'
-
-SCHEME=''
+SCHEME=App
 run_diagnostics
 excludes '-showdestinations'
-printf 'PASS: destination check requires a scheme\n'
+excludes 'xcodebuild <-workspace>'
+excludes 'xcodebuild <-project>'
+printf 'PASS: macOS diagnostics never inspect a project or resolve packages\n'
 
-SCHEME=App
 FAIL_TOOL=xcodebuild
 run_diagnostics
 contains '::warning::'
@@ -218,11 +198,6 @@ grep -E '^\| Linux \| [0-9]+ \| 1 \|$' "$TEMP_DIR/summary" >/dev/null
 printf 'PASS: debug logs and a job summary supplement grouped diagnostics\n'
 
 FAIL_TOOL=''
-run_diagnostics
-excludes 'xcodebuild'
-excludes 'xcrun'
-printf 'PASS: Xcode inputs are ignored on Linux\n'
-
 SUMMARY_PATH=''
 run_diagnostics
 [[ ! -s "$TEMP_DIR/summary" ]]
